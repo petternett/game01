@@ -1,56 +1,18 @@
 import sys
 import os
+from random import randint
 
-holes = {
-    "hole1" : {
-        "x" : -3,
-        "y" : 4
-    },
-    "hole2" : {
-        "x" : 5,
-        "y" : -2
-    },
-    "hole3" : {
-        "x" : 7,
-        "y" : -6
-    }
-}
-
-rocks = {
-    "rock1" : {
-        "x" : 3,
-        "y" : 4
-    },
-    "rock2" : {
-        "x" : 2,
-        "y" : -2
-    },
-    "rock3" : {
-        "x" : -4,
-        "y" : -6
-    }
-}
-
-trees = {
-    "tree1" : {
-        "x" : -8,
-        "y" : -3
-    },
-    "tree2" : {
-        "x" : 4,
-        "y" : -2
-    },
-    "tree3" : {
-        "x" : 1,
-        "y" : 3
-    }
-}
 
 # Global variables
+game_is_running = None
 glob_msg = None
-x = y = None
+player_x = player_y = None
+map_width = map_height = None
+tile_map = None
+hole = None
 
 
+# Helper functions
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -60,74 +22,123 @@ def set_msg(new_msg):
 
 def print_message():
     print(glob_msg)
-    print("\n\n")
+    print("\n")
+
+def generate_hole():
+    holeX = randint(0, width)
+    holeY = randint(0, height)
+    return (holeX, holeY)
 
 
+# Is called at the start of the game
 def start():
-    x = y = 0
-    set_msg("Welcome to the game.")
+    global player_x, player_y
+    global map_width, map_height
+    global game_is_running
+    global tile_map
+    global hole
+
+    map_width = 10
+    map_height = 10
+    # player_x = int(map_width / 2)
+    # player_y = int(map_height / 2)
+    player_x = player_y = 0
+    game_is_running = True
+    tile_map = []
+
+    
+    # Generate hole
+    # while ((hole := generate_hole()) == (x, y)): pass
+    hole = (player_x+1, player_y+1)
+
+    # Populate tilemap
+    tile_map = [["." for i in range(map_width)] for j in range(map_height)]
+    tile_map[hole[1]][hole[0]] = "u"
+    tile_map[player_x][player_y] = "x"
+
+    set_msg("Welcome to the game. You need to enter a hole to win. Type 'quit' to exit.")
 
     update()
 
 
+# Is called every "frame"
+# (every time user makes a move)
 def update():
-    x = y = 0
+    global player_x, player_y
 
-    while True:
+    cam_hw = 5
+
+    while (game_is_running):
         clear_screen()
         print_message()
 
-        curX = x
-        curY = y
+        # Calculate map
+        result = [["" for i in range(cam_hw)] for j in range(cam_hw)]
+
+        i = player_y-1
+        for y in range(0, cam_hw):
+            if (i >= 0 and i < map_height):
+                j = player_x-1
+                for x in range(0, cam_hw):
+                    if (j >= 0 and j < map_width):
+                        # inside map - x axis
+                        result[y][x] += tile_map[i][j]
+                    elif (j == map_width or j == -1):
+                        # outside map - x axis
+                        result[y][x] += "|"
+
+                    j += 1
+
+            elif (i == map_height or i == -1):
+                for x in range(0, cam_hw):
+                    result[y][x] = "_"
+            i += 1
+
+        # Draw map
+        for i in range(0, cam_hw):
+            for j in range(0, cam_hw):
+                print(result[i][j], end=" ")
+            print()
+        print("\n")
+
+
+        cur_x = player_x
+        cur_y = player_y
 
         move = input("Make a move (up/down/left/right): ")
         if move.lower() == "up":
-            y += 1
+            player_y -= 1
+            tile_map[cur_y][cur_x] = "."
+            tile_map[cur_y-1][cur_x] = "x"
         elif move.lower() == "down":
-            y -= 1
+            player_y += 1
+            tile_map[cur_y][cur_x] = "."
+            tile_map[cur_y+1][cur_x] = "x"
         elif move.lower() == "left":
-            x -= 1
+            player_x -= 1
+            tile_map[cur_y][cur_x] = "."
+            tile_map[cur_y][cur_x-1] = "x"
         elif move.lower() == "right":
-            x += 1
+            player_x += 1
+            tile_map[cur_y][cur_x] = "."
+            tile_map[cur_y][cur_x+1] = "x"
         elif move.lower() == "quit":
             sys.exit()
         else:
-            print("Invalid move, try again.")
+            set_msg("Invalid move, try again.")
             continue
 
         # Check if edge
-        if (x >= 11 or x <= -11 or y >= 11 or y <= -11):
+        if (player_x > map_width or player_x < 0 or player_y > map_height or player_y < 0):
             game_over("Oh no, you fell over the edge..")
             sys.exit()
 
         # Check if hole
-        for hole in holes.keys():
-            checkX = holes[hole]["x"]
-            checkY = holes[hole]["y"]
-
-            if (x == checkX and y == checkY):
-                game_over("Oh no, you fell down a hole..")
+        if (player_x == hole[0] and player_y == hole[1]):
+            game_over("You fell down a hole..")
 
 
-        # Check if tree
-        def checkTree(x, y, trees):
-            for tree in trees.keys():
-                checkX = trees[tree]["x"]
-                checkY = trees[tree]["y"]
-
-                if (x == checkX and y == checkY):
-                    x = curX
-                    y = curY
-                    set_msg("Oh no, you ran into a tree! Try another direction.")
-                    return
-
-        checkTree(x, y, trees)
-
-
-
-
-
-        set_msg(f"You moved {move.lower()}, new position is {x}x, {y}y.")
+        set_msg(f"You moved {move.lower()}, new position is {player_x}x, {player_y}y.")
 
 
 
